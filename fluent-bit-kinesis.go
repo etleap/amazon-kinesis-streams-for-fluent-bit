@@ -94,8 +94,8 @@ func newKinesisOutput(ctx unsafe.Pointer, pluginID int) (*kinesis.OutputPlugin, 
 	httpRequestTimeout := output.FLBPluginConfigKey(ctx, "http_request_timeout")
 	logrus.Infof("[kinesis %d] plugin parameter http_request_timeout = '%s'", pluginID, httpRequestTimeout)
 
-	if stream == "" || region == "" {
-		return nil, fmt.Errorf("[kinesis %d] stream and region are required configuration parameters", pluginID)
+	if (stream == "" && streamArn == "") || region == "" {
+		return nil, fmt.Errorf("[kinesis %d] stream or stream_arn, and region are required configuration parameters", pluginID)
 	}
 
 	if partitionKey == "log" {
