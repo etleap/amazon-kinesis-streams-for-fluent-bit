@@ -59,6 +59,8 @@ func getPluginInstance(ctx unsafe.Pointer) *kinesis.OutputPlugin {
 func newKinesisOutput(ctx unsafe.Pointer, pluginID int) (*kinesis.OutputPlugin, error) {
 	stream := output.FLBPluginConfigKey(ctx, "stream")
 	logrus.Infof("[kinesis %d] plugin parameter stream = '%s'", pluginID, stream)
+	streamArn := output.FLBPluginConfigKey(ctx, "stream_arn")
+	logrus.Infof("[kinesis %d] plugin parameter stream_arn = '%s'", pluginID, streamArn)
 	region := output.FLBPluginConfigKey(ctx, "region")
 	logrus.Infof("[kinesis %d] plugin parameter region = '%s'", pluginID, region)
 	dataKeys := output.FLBPluginConfigKey(ctx, "data_keys")
@@ -164,7 +166,7 @@ func newKinesisOutput(ctx unsafe.Pointer, pluginID int) (*kinesis.OutputPlugin, 
 		httpRequestTimeoutDuration = time.Duration(httpRequestTimeoutInt) * time.Second
 	}
 
-	return kinesis.NewOutputPlugin(region, stream, dataKeys, partitionKey, roleARN, kinesisEndpoint, stsEndpoint, timeKey, timeKeyFmt, logKey, replaceDots, concurrencyInt, concurrencyRetriesInt, isAggregate, appendNL, comp, pluginID, httpRequestTimeoutDuration)
+	return kinesis.NewOutputPlugin(region, stream, streamArn, dataKeys, partitionKey, roleARN, kinesisEndpoint, stsEndpoint, timeKey, timeKeyFmt, logKey, replaceDots, concurrencyInt, concurrencyRetriesInt, isAggregate, appendNL, comp, pluginID, httpRequestTimeoutDuration)
 }
 
 func parseNonNegativeConfig(configName string, configValue string, pluginID int) (int, error) {
@@ -175,7 +177,7 @@ func parseNonNegativeConfig(configName string, configValue string, pluginID int)
 	if configValueInt < 0 {
 		return 0, fmt.Errorf("[kinesis %d] Invalid '%s' value (%s) specified, must be a non-negative number", pluginID, configName, configValue)
 	}
-	return  configValueInt, nil
+	return configValueInt, nil
 }
 
 // The "export" comments have syntactic meaning

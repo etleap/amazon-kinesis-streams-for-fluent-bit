@@ -23,7 +23,7 @@ import (
 const concurrencyRetryLimit = 4
 
 // newMockOutputPlugin creates an mock OutputPlugin object
-func newMockOutputPlugin(client *mock_kinesis.MockPutRecordsClient, isAggregate bool) (*OutputPlugin, error) {
+func newMockOutputPlugin(client *mock_kinesis.MockPutRecordsClient, isAggregate bool, useStreamArn bool) (*OutputPlugin, error) {
 
 	timer, _ := plugins.NewTimeout(func(d time.Duration) {
 		logrus.Errorf("[kinesis] timeout threshold reached: Failed to send logs for %v", d)
@@ -38,8 +38,7 @@ func newMockOutputPlugin(client *mock_kinesis.MockPutRecordsClient, isAggregate 
 		aggregator = aggregate.NewAggregator(stringGen)
 	}
 
-	return &OutputPlugin{
-		stream:                "stream",
+	outputPlugin := &OutputPlugin{
 		client:                client,
 		dataKeys:              "",
 		partitionKey:          "",
@@ -50,7 +49,15 @@ func newMockOutputPlugin(client *mock_kinesis.MockPutRecordsClient, isAggregate 
 		isAggregate:           isAggregate,
 		aggregator:            aggregator,
 		replaceDots:           "-",
-	}, nil
+	}
+
+	if useStreamArn {
+		outputPlugin.streamArn = "arn:aws:kinesis:us-west-2:123456789012:stream/stream"
+	} else {
+		outputPlugin.stream = "stream"
+	}
+
+	return outputPlugin, nil
 }
 
 // Test cases for TestStringOrByteArray
@@ -80,7 +87,7 @@ func TestAddRecord(t *testing.T) {
 		"testkey": []byte("test value"),
 	}
 
-	outputPlugin, _ := newMockOutputPlugin(nil, false)
+	outputPlugin, _ := newMockOutputPlugin(nil, false, false)
 
 	timeStamp := time.Now()
 	retCode := outputPlugin.AddRecord(&records, record, &timeStamp)
@@ -95,7 +102,7 @@ func TestTruncateLargeLogEvent(t *testing.T) {
 		"somekey": make([]byte, 1024*1024),
 	}
 
-	outputPlugin, _ := newMockOutputPlugin(nil, false)
+	outputPlugin, _ := newMockOutputPlugin(nil, false, false)
 
 	timeStamp := time.Now()
 	retCode := outputPlugin.AddRecord(&records, record, &timeStamp)
@@ -124,7 +131,7 @@ func TestAddRecordAndFlush(t *testing.T) {
 		FailedRecordCount: aws.Int64(0),
 	}, nil)
 
-	outputPlugin, _ := newMockOutputPlugin(mockKinesis, false)
+	outputPlugin, _ := newMockOutputPlugin(mockKinesis, false, false)
 
 	timeStamp := time.Now()
 	retCode := outputPlugin.AddRecord(&records, record, &timeStamp)
@@ -149,7 +156,7 @@ func TestAddRecordAndFlushAggregate(t *testing.T) {
 		FailedRecordCount: aws.Int64(0),
 	}, nil)
 
-	outputPlugin, _ := newMockOutputPlugin(mockKinesis, true)
+	outputPlugin, _ := newMockOutputPlugin(mockKinesis, true, false)
 
 	checkIsAggregate := outputPlugin.IsAggregate()
 	assert.Equal(t, checkIsAggregate, true, "Expected IsAggregate() to return true")
@@ -188,7 +195,7 @@ func TestAddRecordWithConcurrency(t *testing.T) {
 			}, nil
 		})
 
-	outputPlugin, _ := newMockOutputPlugin(mockKinesis, false)
+	outputPlugin, _ := newMockOutputPlugin(mockKinesis, false, false)
 	// Enable concurrency
 	outputPlugin.Concurrency = 2
 
@@ -223,7 +230,7 @@ func TestAddRecordWithConcurrencyNoRetries(t *testing.T) {
 			}, nil
 		})
 
-	outputPlugin, _ := newMockOutputPlugin(mockKinesis, false)
+	outputPlugin, _ := newMockOutputPlugin(mockKinesis, false, false)
 	// Enable concurrency but no retries
 	outputPlugin.Concurrency = 2
 	outputPlugin.concurrencyRetryLimit = 0
@@ -337,7 +344,7 @@ func TestDotReplace(t *testing.T) {
 		},
 	}
 
-	outputPlugin, _ := newMockOutputPlugin(nil, false)
+	outputPlugin, _ := newMockOutputPlugin(nil, false, false)
 
 	timeStamp := time.Now()
 	retCode := outputPlugin.AddRecord(&records, record, &timeStamp)
@@ -370,7 +377,7 @@ func TestGetPartitionKey(t *testing.T) {
 	}
 
 	//test getPartitionKey() with single partition key
-	outputPlugin, _ := newMockOutputPlugin(nil, false)
+	outputPlugin, _ := newMockOutputPlugin(nil, false, false)
 	outputPlugin.partitionKey = "testKey"
 	value, hasValue := outputPlugin.getPartitionKey(record)
 	assert.Equal(t, true, hasValue, "Should find value")
@@ -440,7 +447,7 @@ func TestNewPutRecordsClient_CustomEndpointWithRoles(t *testing.T) {
 			}
 
 			client, err := newPutRecordsClient(tc.roleARN, "us-west-2", customEndpoint, "", 1, time.Second*30)
-			
+
 			if err != nil {
 				// Expected in test environment without credentials
 				t.Logf("Expected credential error: %v", err)
@@ -455,4 +462,40 @@ func TestNewPutRecordsClient_CustomEndpointWithRoles(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFlushUsesStreamNameOrArn(t *testing.T) {
+	records := make([]*kinesis.PutRecordsRequestEntry, 0, 500)
+	record := map[interface{}]interface{}{
+		"testkey": []byte("test value"),
+	}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockKinesis := mock_kinesis.NewMockPutRecordsClient(ctrl)
+
+	// Test with stream name
+	outputPluginName, _ := newMockOutputPlugin(mockKinesis, false, false)
+	records = records[:0]
+	outputPluginName.AddRecord(&records, record, nil)
+	mockKinesis.EXPECT().PutRecords(gomock.AssignableToTypeOf(&kinesis.PutRecordsInput{})).DoAndReturn(
+		func(input *kinesis.PutRecordsInput) (*kinesis.PutRecordsOutput, error) {
+			assert.Equal(t, aws.StringValue(input.StreamName), "stream")
+			assert.Nil(t, input.StreamARN)
+			return &kinesis.PutRecordsOutput{FailedRecordCount: aws.Int64(0)}, nil
+		})
+	retCode := outputPluginName.Flush(&records)
+	assert.Equal(t, retCode, fluentbit.FLB_OK)
+
+	// Test with stream ARN
+	outputPluginArn, _ := newMockOutputPlugin(mockKinesis, false, true)
+	records = records[:0]
+	outputPluginArn.AddRecord(&records, record, nil)
+	mockKinesis.EXPECT().PutRecords(gomock.AssignableToTypeOf(&kinesis.PutRecordsInput{})).DoAndReturn(
+		func(input *kinesis.PutRecordsInput) (*kinesis.PutRecordsOutput, error) {
+			assert.Equal(t, aws.StringValue(input.StreamARN), "arn:aws:kinesis:us-west-2:123456789012:stream/stream")
+			assert.Nil(t, input.StreamName)
+			return &kinesis.PutRecordsOutput{FailedRecordCount: aws.Int64(0)}, nil
+		})
+	retCode = outputPluginArn.Flush(&records)
+	assert.Equal(t, retCode, fluentbit.FLB_OK)
 }
