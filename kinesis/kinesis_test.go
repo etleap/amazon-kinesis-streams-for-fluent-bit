@@ -447,7 +447,7 @@ func TestNewPutRecordsClient_CustomEndpointWithRoles(t *testing.T) {
 			}
 
 			client, err := newPutRecordsClient(tc.roleARN, "us-west-2", customEndpoint, "", 1, time.Second*30)
-
+			
 			if err != nil {
 				// Expected in test environment without credentials
 				t.Logf("Expected credential error: %v", err)

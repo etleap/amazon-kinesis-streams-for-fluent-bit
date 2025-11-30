@@ -177,7 +177,7 @@ func parseNonNegativeConfig(configName string, configValue string, pluginID int)
 	if configValueInt < 0 {
 		return 0, fmt.Errorf("[kinesis %d] Invalid '%s' value (%s) specified, must be a non-negative number", pluginID, configName, configValue)
 	}
-	return configValueInt, nil
+	return  configValueInt, nil
 }
 
 // The "export" comments have syntactic meaning
