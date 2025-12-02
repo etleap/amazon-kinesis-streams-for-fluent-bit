@@ -24,7 +24,7 @@ make release
 
 Then, tag the image and push to our repo:
 
-```
+```bash
 docker tag amazon/aws-for-fluent-bit:latest-al2 841591717599.dkr.ecr.us-east-1.amazonaws.com/aws-for-fluent-bit:latest
 docker push 841591717599.dkr.ecr.us-east-1.amazonaws.com/aws-for-fluent-bit:latest
 ```
