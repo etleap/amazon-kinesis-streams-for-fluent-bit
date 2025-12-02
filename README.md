@@ -1,6 +1,35 @@
 [![Test Actions Status](https://github.com/aws/amazon-kinesis-streams-for-fluent-bit/workflows/Build/badge.svg)](https://github.com/aws/amazon-kinesis-streams-for-fluent-bit/actions)
 ## Fluent Bit Plugin for Amazon Kinesis Data Streams
 
+## # Building the docker image with the custom plugin:
+
+Clone the [AWS for fluent bit repository](https://github.com/aws/aws-for-fluent-bit):
+```bash
+git clone git@github.com:aws/aws-for-fluent-bit.git
+```
+
+Make sure you have gnu-getopt installed:
+```bash
+brew install gnu-getopt
+brew link --force gnu-getopt
+```
+
+Build the docker image with the custom plugin:
+```bash
+cd aws-for-fluent-bit
+export KINESIS_PLUGIN_CLONE_URL=https://github.com/etleap/amazon-kinesis-streams-for-fluent-bit.git
+export KINESIS_PLUGIN_BRANCH=mainline
+make release
+```
+
+Then, tag the image and push to our repo:
+
+```
+docker tag amazon/aws-for-fluent-bit:latest-al2 841591717599.dkr.ecr.us-east-1.amazonaws.com/aws-for-fluent-bit:latest
+docker push 841591717599.dkr.ecr.us-east-1.amazonaws.com/aws-for-fluent-bit:latest
+```
+
+
 **NOTE: A new higher performance Fluent Bit Kinesis Plugin has been released.** Check out our [official guidance](#new-higher-performance-core-fluent-bit-plugin).
 
 A Fluent Bit output plugin for Amazon Kinesis Data Streams.
