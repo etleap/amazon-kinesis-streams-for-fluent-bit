@@ -1,7 +1,7 @@
 [![Test Actions Status](https://github.com/aws/amazon-kinesis-streams-for-fluent-bit/workflows/Build/badge.svg)](https://github.com/aws/amazon-kinesis-streams-for-fluent-bit/actions)
 ## Fluent Bit Plugin for Amazon Kinesis Data Streams
 
-## # Building the docker image with the custom plugin:
+### Building the docker image with the custom plugin:
 
 Clone the [AWS for fluent bit repository](https://github.com/aws/aws-for-fluent-bit):
 ```bash
