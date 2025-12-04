@@ -59,6 +59,8 @@ func getPluginInstance(ctx unsafe.Pointer) *kinesis.OutputPlugin {
 func newKinesisOutput(ctx unsafe.Pointer, pluginID int) (*kinesis.OutputPlugin, error) {
 	stream := output.FLBPluginConfigKey(ctx, "stream")
 	logrus.Infof("[kinesis %d] plugin parameter stream = '%s'", pluginID, stream)
+	streamArn := output.FLBPluginConfigKey(ctx, "stream_arn")
+	logrus.Infof("[kinesis %d] plugin parameter stream_arn = '%s'", pluginID, streamArn)
 	region := output.FLBPluginConfigKey(ctx, "region")
 	logrus.Infof("[kinesis %d] plugin parameter region = '%s'", pluginID, region)
 	dataKeys := output.FLBPluginConfigKey(ctx, "data_keys")
@@ -92,8 +94,8 @@ func newKinesisOutput(ctx unsafe.Pointer, pluginID int) (*kinesis.OutputPlugin, 
 	httpRequestTimeout := output.FLBPluginConfigKey(ctx, "http_request_timeout")
 	logrus.Infof("[kinesis %d] plugin parameter http_request_timeout = '%s'", pluginID, httpRequestTimeout)
 
-	if stream == "" || region == "" {
-		return nil, fmt.Errorf("[kinesis %d] stream and region are required configuration parameters", pluginID)
+	if (stream == "" && streamArn == "") || region == "" {
+		return nil, fmt.Errorf("[kinesis %d] stream or stream_arn, and region are required configuration parameters", pluginID)
 	}
 
 	if partitionKey == "log" {
@@ -164,7 +166,7 @@ func newKinesisOutput(ctx unsafe.Pointer, pluginID int) (*kinesis.OutputPlugin, 
 		httpRequestTimeoutDuration = time.Duration(httpRequestTimeoutInt) * time.Second
 	}
 
-	return kinesis.NewOutputPlugin(region, stream, dataKeys, partitionKey, roleARN, kinesisEndpoint, stsEndpoint, timeKey, timeKeyFmt, logKey, replaceDots, concurrencyInt, concurrencyRetriesInt, isAggregate, appendNL, comp, pluginID, httpRequestTimeoutDuration)
+	return kinesis.NewOutputPlugin(region, stream, streamArn, dataKeys, partitionKey, roleARN, kinesisEndpoint, stsEndpoint, timeKey, timeKeyFmt, logKey, replaceDots, concurrencyInt, concurrencyRetriesInt, isAggregate, appendNL, comp, pluginID, httpRequestTimeoutDuration)
 }
 
 func parseNonNegativeConfig(configName string, configValue string, pluginID int) (int, error) {

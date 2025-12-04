@@ -1,6 +1,35 @@
 [![Test Actions Status](https://github.com/aws/amazon-kinesis-streams-for-fluent-bit/workflows/Build/badge.svg)](https://github.com/aws/amazon-kinesis-streams-for-fluent-bit/actions)
 ## Fluent Bit Plugin for Amazon Kinesis Data Streams
 
+### Building the docker image with the custom plugin:
+
+Clone the [AWS for fluent bit repository](https://github.com/aws/aws-for-fluent-bit):
+```bash
+git clone git@github.com:aws/aws-for-fluent-bit.git
+```
+
+Make sure you have gnu-getopt installed:
+```bash
+brew install gnu-getopt
+brew link --force gnu-getopt
+```
+
+Build the docker image with the custom plugin:
+```bash
+cd aws-for-fluent-bit
+export KINESIS_PLUGIN_CLONE_URL=https://github.com/etleap/amazon-kinesis-streams-for-fluent-bit.git
+export KINESIS_PLUGIN_BRANCH=mainline
+make release
+```
+
+Then, tag the image and push to our repo:
+
+```bash
+docker tag amazon/aws-for-fluent-bit:latest-al2 841591717599.dkr.ecr.us-east-1.amazonaws.com/aws-for-fluent-bit:latest
+docker push 841591717599.dkr.ecr.us-east-1.amazonaws.com/aws-for-fluent-bit:latest
+```
+
+
 **NOTE: A new higher performance Fluent Bit Kinesis Plugin has been released.** Check out our [official guidance](#new-higher-performance-core-fluent-bit-plugin).
 
 A Fluent Bit output plugin for Amazon Kinesis Data Streams.
@@ -35,6 +64,7 @@ After this step, run `make windows-release`. Then use with Fluent Bit on Windows
 
 * `region`: The region which your Kinesis Data Stream is in.
 * `stream`: The name of the Kinesis Data Stream that you want log records sent to.
+* `stream_arn`: The ARN of the Kinesis Data Stream that you want log records sent to. This option allows you to send data to streams in different AWS accounts. If both `stream` and `stream_arn` are provided, `stream_arn` will take precedence.
 * `partition_key`: A partition key is used to group data by shard within a stream. A Kinesis Data Stream uses the partition key that is associated with each data record to determine which shard a given data record belongs to. For example, if your logs come from Docker containers, you can use container_id as the partition key, and the logs will be grouped and stored on different shards depending upon the id of the container they were generated from. As the data within a shard are coarsely ordered, you will get all your logs from one container in one shard roughly in order. Nested partition key is supported and you can use `->` to point to your target key which is nested under another key. For example, your `partition_key` could be `kubernetes->pod_name`. If you don't set a partition key or put an invalid one, a random key will be generated, and the logs will be directed to random shards. If the partition key is invalid, the plugin will print an warning message.
 * `data_keys`: By default, the whole log record will be sent to Kinesis. If you specify key name(s) with this option, then only those keys and values will be sent to Kinesis. For example, if you are using the Fluentd Docker log driver, you can specify `data_keys log` and only the log message will be sent to Kinesis. If you specify multiple keys, they should be comma delimited.
 * `log_key`: By default, the whole log record will be sent to Kinesis. If you specify a key name with this option, then only the value of that key will be sent to Kinesis. For example, if you are using the Fluentd Docker log driver, you can specify `log_key log` and only the log message will be sent to Kinesis.

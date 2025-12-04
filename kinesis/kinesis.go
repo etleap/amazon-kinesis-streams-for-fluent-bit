@@ -86,6 +86,8 @@ const (
 type OutputPlugin struct {
 	// The name of the stream that you want log records sent to
 	stream string
+	// The ARN of the stream that you want log records sent to. If both stream name and streamArn are provided, streamArn will be used
+	streamArn string
 	// If specified, only these keys and values will be send as the log record
 	dataKeys string
 	// If specified, the value of that data key will be used as the partition key.
@@ -115,7 +117,7 @@ type OutputPlugin struct {
 }
 
 // NewOutputPlugin creates an OutputPlugin object
-func NewOutputPlugin(region, stream, dataKeys, partitionKey, roleARN, kinesisEndpoint, stsEndpoint, timeKey, timeFmt, logKey, replaceDots string, concurrency, retryLimit int, isAggregate, appendNewline bool, compression CompressionType, pluginID int, httpRequestTimeout time.Duration) (*OutputPlugin, error) {
+func NewOutputPlugin(region, stream, streamArn, dataKeys, partitionKey, roleARN, kinesisEndpoint, stsEndpoint, timeKey, timeFmt, logKey, replaceDots string, concurrency, retryLimit int, isAggregate, appendNewline bool, compression CompressionType, pluginID int, httpRequestTimeout time.Duration) (*OutputPlugin, error) {
 	client, err := newPutRecordsClient(roleARN, region, kinesisEndpoint, stsEndpoint, pluginID, httpRequestTimeout)
 	if err != nil {
 		return nil, err
@@ -152,6 +154,7 @@ func NewOutputPlugin(region, stream, dataKeys, partitionKey, roleARN, kinesisEnd
 
 	return &OutputPlugin{
 		stream:                stream,
+		streamArn:             streamArn,
 		client:                client,
 		dataKeys:              dataKeys,
 		partitionKey:          partitionKey,
@@ -504,10 +507,17 @@ func (outputPlugin *OutputPlugin) sendCurrentBatch(records *[]*kinesis.PutRecord
 		return fluentbit.FLB_OK, nil
 	}
 	outputPlugin.timer.Check()
-	response, err := outputPlugin.client.PutRecords(&kinesis.PutRecordsInput{
-		Records:    *records,
-		StreamName: aws.String(outputPlugin.stream),
-	})
+
+	putRecordsInput := &kinesis.PutRecordsInput{
+		Records: *records,
+	}
+	if outputPlugin.streamArn != "" {
+		putRecordsInput.StreamARN = aws.String(outputPlugin.streamArn)
+	} else {
+		putRecordsInput.StreamName = aws.String(outputPlugin.stream)
+	}
+
+	response, err := outputPlugin.client.PutRecords(putRecordsInput)
 	if err != nil {
 		logrus.Errorf("[kinesis %d] PutRecords failed with %v\n", outputPlugin.PluginID, err)
 		outputPlugin.timer.Start()
